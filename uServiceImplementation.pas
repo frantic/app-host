@@ -12,11 +12,14 @@ type
     procedure ServiceAfterInstall(Sender: TService);
     procedure ServiceStart(Sender: TService; var Started: Boolean);
     procedure ServiceStop(Sender: TService; var Stopped: Boolean);
+    procedure ServiceShutdown(Sender: TService);
+    procedure ServiceExecute(Sender: TService);
   private
     Config: TIniFile;
   public
     function GetServiceController: TServiceController; override;
     procedure Log(AMessage: string);
+    procedure LogT(AMessage: string);
   end;
 
 var
@@ -59,9 +62,14 @@ begin
   end;
 end;
 
+procedure THostService.LogT(AMessage: string);
+begin
+  Log(FormatDateTime('yyyy-MM-dd hh:mm:ss ', Now) + AMessage);
+end;
+
 procedure THostService.ServiceAfterInstall(Sender: TService);
 begin
-  Log('Service successfuly installed!');
+  LogT('Service successfuly installed!');
 end;
 
 procedure THostService.ServiceCreate(Sender: TObject);
@@ -69,17 +77,27 @@ begin
   Config := TIniFile.Create(ChangeFileExt(ParamStr(0), '.ini'));
   Name := Config.ReadString('Service', 'Name', 'AppHostService');
   DisplayName := Config.ReadString('Service', 'DisplayName', 'AppHostService');
-  Log('Created service instance: ' + Name);
+  LogT(Format('Created service instance: %s (%s)', [Name, DisplayName]));
+end;
+
+procedure THostService.ServiceExecute(Sender: TService);
+begin
+  Sleep(2000);
+end;
+
+procedure THostService.ServiceShutdown(Sender: TService);
+begin
+  LogT('Shutdown');
 end;
 
 procedure THostService.ServiceStart(Sender: TService; var Started: Boolean);
 begin
-  Log('Service started');
+  LogT('Service started');
 end;
 
 procedure THostService.ServiceStop(Sender: TService; var Stopped: Boolean);
 begin
-  Log('Service stopped');
+  LogT('Service stopped');
 end;
 
 end.
