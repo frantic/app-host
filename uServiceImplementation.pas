@@ -157,7 +157,7 @@ begin
   StartupInfo.dwFlags := STARTF_USESTDHANDLES + STARTF_USESHOWWINDOW;
   StartupInfo.wShowWindow := SW_HIDE;
 
-  AppCommandLine := Config.ReadString('App', 'Cmd', '');
+  AppCommandLine := Config.ReadString('Service', 'Cmd', '');
   LogT('Running ' + AppCommandLine);
 
   if not CreateProcess(nil, PChar(AppCommandLine), @Security, @Security, True,
