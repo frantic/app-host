@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, SvcMgr, Dialogs,
-  IniFiles;
+  IniFiles, WinSvc;
 
 type
   THostService = class(TService)
@@ -29,6 +29,30 @@ var
 implementation
 
 {$R *.DFM}
+
+function StartService(Server: String; ServiceName: String): Boolean;
+var
+  SCH   : SC_HANDLE;
+  SvcSCH: SC_HANDLE;
+  Arg   : PChar;
+begin
+  SCH := OpenSCManager(PChar(Server), nil, SC_MANAGER_ALL_ACCESS);
+  SvcSCH := OpenService(SCH, PChar(ServiceName), SERVICE_ALL_ACCESS);
+  Arg := nil;
+  Result := WinSvc.StartService(SvcSCH, 0, Arg);
+end;
+
+function StopService(Server: String; ServiceName: String): Boolean;
+var
+  SCH   : SC_HANDLE;
+  SvcSCH: SC_HANDLE;
+  Ss    : TServiceStatus;
+begin
+  SCH := OpenSCManager(PChar(Server), nil, SC_MANAGER_ALL_ACCESS);
+  SvcSCH := OpenService(SCH, PChar(ServiceName), SERVICE_ALL_ACCESS);
+  Result := WinSvc.ControlService(SvcSCH, SERVICE_CONTROL_STOP, ss);
+end;
+
 
 procedure ServiceController(CtrlCode: DWord); stdcall;
 begin
@@ -100,6 +124,11 @@ begin
   DisplayName := Config.ReadString('Service', 'DisplayName', 'AppHostService');
   LogT('---');
   LogT(Format('Created service instance: %s (%s)', [Name, DisplayName]));
+
+  if FindCmdLineSwitch('start', ['-', '/'], True) then
+    StartService('', Name);
+  if FindCmdLineSwitch('stop', ['-', '/'], True) then
+    StopService('', Name);
 end;
 
 procedure THostService.ServiceExecute(Sender: TService);
