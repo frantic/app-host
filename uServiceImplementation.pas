@@ -18,7 +18,8 @@ type
     Config: TIniFile;
   public
     function GetServiceController: TServiceController; override;
-    procedure Log(AMessage: string);
+    procedure DumpTextFromHandle(Pipe: THandle);
+    procedure LogDump(ABytes: RawByteString);
     procedure LogT(AMessage: string);
   end;
 
@@ -34,15 +35,35 @@ begin
   HostService.Controller(CtrlCode);
 end;
 
+procedure THostService.DumpTextFromHandle(Pipe: THandle);
+const
+  BufferSize = 2048;
+var
+  BytesRead: Cardinal;
+  Buffer: RawByteString;
+begin
+  BytesRead := 0;
+  PeekNamedPipe(Pipe, nil, 0, nil, @BytesRead, nil);
+  if BytesRead = 0 then
+    Exit;
+
+  SetLength(Buffer, BufferSize);
+  repeat
+    ReadFile(Pipe, Buffer[1], BufferSize, BytesRead, nil);
+    if BytesRead > 0 then
+      LogDump(Copy(Buffer, 1, BytesRead));
+  until BytesRead < BufferSize;
+  SetLength(Buffer, 0);
+end;
+
 function THostService.GetServiceController: TServiceController;
 begin
   Result := ServiceController;
 end;
 
-procedure THostService.Log(AMessage: string);
+procedure THostService.LogDump(ABytes: RawByteString);
 var
   FS: TFileStream;
-  MsgWithCRLF: RawByteString;
   FileName: string;
   OpenMode: Word;
 begin
@@ -55,8 +76,7 @@ begin
   FS := TFileStream.Create(FileName, OpenMode or fmShareDenyNone);
   try
     FS.Seek(0, soFromEnd);
-    MsgWithCRLF := UTF8Encode(AMessage + #13#10);
-    FS.Write(MsgWithCRLF[1], Length(MsgWithCRLF));
+    FS.Write(ABytes[1], Length(ABytes));
   finally
     FS.Free;
   end;
@@ -64,7 +84,7 @@ end;
 
 procedure THostService.LogT(AMessage: string);
 begin
-  Log(FormatDateTime('yyyy-MM-dd hh:mm:ss ', Now) + AMessage);
+  LogDump(UTF8Encode('*** ' + FormatDateTime('yyyy-MM-dd hh:mm:ss ', Now) + AMessage + #13#10));
 end;
 
 procedure THostService.ServiceAfterInstall(Sender: TService);
@@ -74,15 +94,76 @@ end;
 
 procedure THostService.ServiceCreate(Sender: TObject);
 begin
+  SetCurrentDir(ExtractFilePath(ParamStr(0)));
   Config := TIniFile.Create(ChangeFileExt(ParamStr(0), '.ini'));
   Name := Config.ReadString('Service', 'Name', 'AppHostService');
   DisplayName := Config.ReadString('Service', 'DisplayName', 'AppHostService');
+  LogT('---');
   LogT(Format('Created service instance: %s (%s)', [Name, DisplayName]));
 end;
 
 procedure THostService.ServiceExecute(Sender: TService);
+var
+  Security: TSecurityAttributes;
+  ReadPipe, WritePipe: THandle;
+  StartupInfo: TStartupInfo;
+  ProcessInfo: TProcessInformation;
+  AppIsRunning: Boolean;
+  AppCommandLine: string;
 begin
-  Sleep(2000);
+  Security.nLength := SizeOf(TSecurityAttributes);
+  Security.bInheritHandle := True;
+  Security.lpSecurityDescriptor := nil;
+
+  if not CreatePipe(ReadPipe, WritePipe, @Security, 0) then
+  begin
+    LogT('Failed to create read/write pipe: ' + SysErrorMessage(GetLastError));
+    Exit;
+  end;
+
+  FillChar(StartupInfo, SizeOf(TStartupInfo), 0);
+  StartupInfo.cb := SizeOf(TStartupInfo);
+  StartupInfo.hStdError := WritePipe;
+  StartupInfo.hStdOutput := WritePipe;
+  StartupInfo.dwFlags := STARTF_USESTDHANDLES + STARTF_USESHOWWINDOW;
+  StartupInfo.wShowWindow := SW_HIDE;
+
+  AppCommandLine := Config.ReadString('App', 'Cmd', '');
+  LogT('Running ' + AppCommandLine);
+
+  if not CreateProcess(nil, PChar(AppCommandLine), @Security, @Security, True,
+    NORMAL_PRIORITY_CLASS, nil, nil, StartupInfo, ProcessInfo)
+  then
+  begin
+    LogT('Failed to create process: ' + SysErrorMessage(GetLastError));
+    Exit;
+  end;
+
+  LogT('Created process with handle = ' + IntToStr(ProcessInfo.dwProcessId));
+
+  while True do
+  begin
+    AppIsRunning := WaitForSingleObject(ProcessInfo.hProcess, 100) = WAIT_TIMEOUT;
+    DumpTextFromHandle(ReadPipe);
+    if not AppIsRunning then
+    begin
+      LogT('App terminated');
+      Break;
+    end;
+
+    ServiceThread.ProcessRequests(False);
+    if Terminated then
+    begin
+      LogT('Service is terminated, killing the process');
+      TerminateProcess(ProcessInfo.hProcess, 1);
+      Break;
+    end;
+  end;
+
+  CloseHandle(ProcessInfo.hProcess);
+  CloseHandle(ProcessInfo.hThread);
+  CloseHandle(ReadPipe);
+  CloseHandle(WritePipe);
 end;
 
 procedure THostService.ServiceShutdown(Sender: TService);
