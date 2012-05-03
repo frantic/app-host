@@ -1,0 +1,7 @@
+__history
+*.local
+*.identcache
+*.~*
+*.drc
+lib
+bin
