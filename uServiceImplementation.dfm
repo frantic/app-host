@@ -1,6 +1,10 @@
-object Service1: TService1
+object HostService: THostService
   OldCreateOrder = False
-  DisplayName = 'Service1'
+  OnCreate = ServiceCreate
+  DisplayName = 'HostService'
+  AfterInstall = ServiceAfterInstall
+  OnStart = ServiceStart
+  OnStop = ServiceStop
   Height = 150
   Width = 215
 end

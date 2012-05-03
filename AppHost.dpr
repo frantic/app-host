@@ -2,7 +2,7 @@ program AppHost;
 
 uses
   SvcMgr,
-  uServiceImplementation in 'uServiceImplementation.pas' {Service1: TService};
+  uServiceImplementation in 'uServiceImplementation.pas' {HostService: TService};
 
 {$R *.RES}
 
@@ -23,6 +23,6 @@ begin
   //
   if not Application.DelayInitialize or Application.Installing then
     Application.Initialize;
-  Application.CreateForm(TService1, Service1);
+  Application.CreateForm(THostService, HostService);
   Application.Run;
 end.

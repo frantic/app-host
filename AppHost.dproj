@@ -21,8 +21,8 @@
 		</PropertyGroup>
 		<PropertyGroup Condition="'$(Base)'!=''">
 			<DCC_DcuOutput>lib</DCC_DcuOutput>
-			<DCC_BplOutput>bin</DCC_BplOutput>
-			<DCC_DependencyCheckOutputName>AppHost.exe</DCC_DependencyCheckOutputName>
+			<DCC_ExeOutput>bin</DCC_ExeOutput>
+			<DCC_DependencyCheckOutputName>bin\AppHost.exe</DCC_DependencyCheckOutputName>
 			<DCC_ImageBase>00400000</DCC_ImageBase>
 			<DCC_UnitAlias>WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE;$(DCC_UnitAlias)</DCC_UnitAlias>
 			<DCC_Platform>x86</DCC_Platform>
@@ -46,7 +46,7 @@
 				<MainSource>MainSource</MainSource>
 			</DelphiCompile>
 			<DCCReference Include="uServiceImplementation.pas">
-				<Form>Service1</Form>
+				<Form>HostService</Form>
 				<DesignClass>TService</DesignClass>
 			</DCCReference>
 			<BuildConfiguration Include="Base">

@@ -3,19 +3,24 @@ unit uServiceImplementation;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, SvcMgr, Dialogs;
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, SvcMgr, Dialogs,
+  IniFiles;
 
 type
-  TService1 = class(TService)
+  THostService = class(TService)
+    procedure ServiceCreate(Sender: TObject);
+    procedure ServiceAfterInstall(Sender: TService);
+    procedure ServiceStart(Sender: TService; var Started: Boolean);
+    procedure ServiceStop(Sender: TService; var Stopped: Boolean);
   private
-    { Private declarations }
+    Config: TIniFile;
   public
     function GetServiceController: TServiceController; override;
-    { Public declarations }
+    procedure Log(AMessage: string);
   end;
 
 var
-  Service1: TService1;
+  HostService: THostService;
 
 implementation
 
@@ -23,12 +28,58 @@ implementation
 
 procedure ServiceController(CtrlCode: DWord); stdcall;
 begin
-  Service1.Controller(CtrlCode);
+  HostService.Controller(CtrlCode);
 end;
 
-function TService1.GetServiceController: TServiceController;
+function THostService.GetServiceController: TServiceController;
 begin
   Result := ServiceController;
+end;
+
+procedure THostService.Log(AMessage: string);
+var
+  FS: TFileStream;
+  MsgWithCRLF: RawByteString;
+  FileName: string;
+  OpenMode: Word;
+begin
+  FileName := ChangeFileExt(ParamStr(0), '.log');
+  if FileExists(FileName) then
+    OpenMode := fmOpenReadWrite
+  else
+    OpenMode := fmCreate;
+
+  FS := TFileStream.Create(FileName, OpenMode or fmShareDenyNone);
+  try
+    FS.Seek(0, soFromEnd);
+    MsgWithCRLF := UTF8Encode(AMessage + #13#10);
+    FS.Write(MsgWithCRLF[1], Length(MsgWithCRLF));
+  finally
+    FS.Free;
+  end;
+end;
+
+procedure THostService.ServiceAfterInstall(Sender: TService);
+begin
+  Log('Service successfuly installed!');
+end;
+
+procedure THostService.ServiceCreate(Sender: TObject);
+begin
+  Config := TIniFile.Create(ChangeFileExt(ParamStr(0), '.ini'));
+  Name := Config.ReadString('Service', 'Name', 'AppHostService');
+  DisplayName := Config.ReadString('Service', 'DisplayName', 'AppHostService');
+  Log('Created service instance: ' + Name);
+end;
+
+procedure THostService.ServiceStart(Sender: TService; var Started: Boolean);
+begin
+  Log('Service started');
+end;
+
+procedure THostService.ServiceStop(Sender: TService; var Stopped: Boolean);
+begin
+  Log('Service stopped');
 end;
 
 end.
